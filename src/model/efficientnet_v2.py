@@ -13,11 +13,11 @@ class EfficientNetV2(LightningModule):
 
         match model_size:
             case 's':
-                self.model = efficientnet_v2_s()
+                self.model = efficientnet_v2_s(weights='DEFAULT')
             case 'm':
-                self.model = efficientnet_v2_m()
+                self.model = efficientnet_v2_m(weights='DEFAULT')
             case 'l':
-                self.model = efficientnet_v2_l()
+                self.model = efficientnet_v2_l(weights='DEFAULT')
             case _:
                 raise ValueError(f'Unsupported model_size: {model_size}')
 

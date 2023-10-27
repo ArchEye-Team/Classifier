@@ -13,7 +13,7 @@ if __name__ == '__main__':
 
     data_module = DataModule(
         data_path=root_dir / 'dataset',
-        batch_size=4,
+        batch_size=5,
         num_workers=4,
         image_size=512
     )
