@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from lightning import seed_everything, Trainer
-from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 
 from model.efficientnet_v2 import EfficientNetV2
 from data.datamodule import DataModule
@@ -31,7 +31,15 @@ if __name__ == '__main__':
         callbacks=[
             ModelCheckpoint(
                 dirpath=root_dir / 'checkpoints',
-                save_last=True
+                save_last=True,
+                save_top_k=3,
+                monitor='val_loss_epoch',
+                mode='min',
+            ),
+            EarlyStopping(
+                monitor='val_loss_epoch',
+                mode='min',
+                patience=10,
             )
         ]
     )
