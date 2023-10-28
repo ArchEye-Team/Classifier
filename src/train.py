@@ -2,6 +2,7 @@ from pathlib import Path
 
 from lightning import seed_everything, Trainer
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
+from lightning.pytorch.loggers import MLFlowLogger
 
 from model.efficientnet_v2 import EfficientNetV2
 from data.datamodule import DataModule
@@ -28,18 +29,23 @@ if __name__ == '__main__':
         deterministic=True,
         max_epochs=-1,
         accelerator='gpu',
+        logger=MLFlowLogger(
+            tracking_uri='http://212.233.73.128:5000',
+            experiment_name='lightning_logs',
+            log_model='all'
+        ),
         callbacks=[
             ModelCheckpoint(
                 dirpath=root_dir / 'checkpoints',
                 save_last=True,
                 save_top_k=3,
-                monitor='val_loss_epoch',
-                mode='min',
+                monitor='val_f1',
+                mode='max',
             ),
             EarlyStopping(
-                monitor='val_loss_epoch',
-                mode='min',
-                patience=10,
+                patience=15,
+                monitor='val_f1',
+                mode='max',
             )
         ]
     )
