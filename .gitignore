@@ -1,6 +1,7 @@
 /dataset
 /lightning_logs
 /checkpoints
+/env.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
