@@ -1,17 +1,18 @@
+import numpy as np
 from lightning import LightningDataModule
-from torch.utils.data import random_split, DataLoader
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader, Subset
 
 from .dataset import Dataset
 
 
 class DataModule(LightningDataModule):
-    def __init__(self, data_path, batch_size, num_workers, image_size):
+    def __init__(self, data_path, batch_size, num_workers):
         super().__init__()
 
         self.data_path = data_path
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.image_size = image_size
 
         self.train = None
         self.val = None
@@ -26,16 +27,32 @@ class DataModule(LightningDataModule):
     def setup(self, stage: str):
         if stage == 'fit':
             dataset = Dataset(self, train=True)
-            self.train, self.val = random_split(dataset, lengths=[0.8, 0.2])
+
+            train_idx, val_idx = train_test_split(np.arange(len(dataset)),
+                                                  test_size=0.2,
+                                                  stratify=dataset.class_ids)
+
+            self.train = Subset(dataset, train_idx)
+            self.val = Subset(dataset, val_idx)
+
         if stage == 'test':
             self.test = Dataset(self, train=False)
 
     def train_dataloader(self):
-        return DataLoader(self.train, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=True,
+        return DataLoader(self.train,
+                          batch_size=self.batch_size,
+                          num_workers=self.num_workers,
+                          shuffle=True,
                           persistent_workers=True)
 
     def val_dataloader(self):
-        return DataLoader(self.val, batch_size=self.batch_size, num_workers=self.num_workers, persistent_workers=True)
+        return DataLoader(self.val,
+                          batch_size=self.batch_size,
+                          num_workers=self.num_workers,
+                          persistent_workers=True)
 
     def test_dataloader(self):
-        return DataLoader(self.test, batch_size=self.batch_size, num_workers=self.num_workers, persistent_workers=True)
+        return DataLoader(self.test,
+                          batch_size=self.batch_size,
+                          num_workers=self.num_workers,
+                          persistent_workers=True)

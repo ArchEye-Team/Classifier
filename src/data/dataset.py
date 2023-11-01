@@ -1,12 +1,11 @@
-import torch
+import albumentations as A
+import cv2
+from albumentations.pytorch import ToTensorV2
 from torch.utils.data import Dataset as TorchDataset
-from torchvision.io import read_image, ImageReadMode
-from torchvision.transforms import v2
 
 
 class Dataset(TorchDataset):
     def __init__(self, data_module, train):
-        self.data_module = data_module
         self.train = train
 
         self.num_classes = 0
@@ -14,9 +13,10 @@ class Dataset(TorchDataset):
         self.id2class = []
         self.class_count = []
 
-        self.dataset = []
+        self.image_paths = []
+        self.class_ids = []
 
-        dataset_dir = self.data_module.data_path
+        dataset_dir = data_module.data_path
         class_dirs = sorted((class_dir for class_dir in dataset_dir.iterdir() if class_dir.is_dir()),
                             key=lambda class_dir: class_dir.name)
 
@@ -30,43 +30,47 @@ class Dataset(TorchDataset):
 
             class_id = self.num_classes - 1
 
-            labeled_images = [(image_path, class_id) for image_path in
-                              sorted((image_path for image_path in class_dir.iterdir() if image_path.is_file()),
-                                     key=lambda image_path: image_path.name)]
+            image_paths = sorted((image_path for image_path in class_dir.iterdir() if image_path.is_file()),
+                                 key=lambda image_path: image_path.name)
 
-            self.class_count[class_id] += len(labeled_images)
+            self.class_count[class_id] += len(image_paths)
 
-            split_size = int(len(labeled_images) * 0.8)
+            split_size = int(len(image_paths) * 0.8)
 
-            self.dataset.extend(labeled_images[:split_size] if self.train else labeled_images[split_size:])
+            for image_path in (image_paths[:split_size] if self.train else image_paths[split_size:]):
+                self.image_paths.append(image_path)
+                self.class_ids.append(class_id)
 
         self.class_weights = [1 - count / sum(self.class_count) for count in self.class_count]
 
-    def __len__(self):
-        return len(self.dataset)
-
-    def __getitem__(self, index):
-        image_path, class_id = self.dataset[index]
-
-        image = read_image(str(image_path), mode=ImageReadMode.RGB)
-
-        transforms = [
-            v2.Resize(size=(self.data_module.image_size, self.data_module.image_size), antialias=True)
-        ]
-
-        if self.train:
-            transforms.extend([
-                v2.RandomVerticalFlip(p=0.5),
-                v2.RandomHorizontalFlip(p=0.5),
-                v2.RandomRotation(degrees=60),
-                v2.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3)
-            ])
-
-        transforms.extend([
-            v2.ToDtype(torch.float32, scale=True),
-            v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        self.train_transforms = A.Compose([
+            A.SmallestMaxSize(max_size=850),
+            A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.05, rotate_limit=15),
+            A.RandomCrop(height=512, width=512),
+            A.RGBShift(r_shift_limit=15, g_shift_limit=15, b_shift_limit=15),
+            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            ToTensorV2()
         ])
 
-        image = v2.Compose(transforms)(image)
+        self.transforms = A.Compose([
+            A.Resize(height=512, width=512),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            ToTensorV2()
+        ])
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, index):
+        image_path, class_id = self.image_paths[index], self.class_ids[index]
+
+        image = cv2.imread(str(image_path))
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        if self.train:
+            image = self.train_transforms(image=image)['image']
+        else:
+            image = self.transforms(image=image)['image']
 
         return image, class_id
